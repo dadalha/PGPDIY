@@ -1,0 +1,21 @@
+{
+    "target_overrides": {
+        "K64F": {
+            "target.features_add": ["BLE"],
+            "target.extra_labels_add": ["ST_BLUENRG"]
+        },
+        "NUCLEO_F401RE": {
+            "target.features_add": ["BLE"],
+            "target.extra_labels_add": ["ST_BLUENRG"]
+        },
+        "DISCO_L475VG_IOT01A": {
+            "target.features_add": ["BLE"],
+            "target.extra_labels_add": ["ST_BLUENRG"]
+        },
+        "*": {
+          "nordic-ble.uuid_table_max_entries": 13,
+          "nordic-ble.gatt_attr_tab_size": "0x700",
+          "nordic-ble.is_srvc_changed_charact_present": 1
+        }
+    }
+}

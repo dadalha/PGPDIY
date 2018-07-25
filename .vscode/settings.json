@@ -1,0 +1,13 @@
+// Place your settings in this file to overwrite default and user settings.
+{
+    "files.associations": {
+        "*.tcc": "cpp",
+        "array": "cpp",
+        "functional": "cpp",
+        "type_traits": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp"
+    }
+    // "C_Cpp.addWorkspaceRootToIncludePath": false
+    // "C_Cpp.intelliSenseEngine": "Tag Parser"
+}
