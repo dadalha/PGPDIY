@@ -26,37 +26,91 @@ class Handshake
 public:
     enum HandshakeStep
     {
+        NONE,
+
         // No handshake ever done
-        ZERO,
+        CONNECTED,
         BOND_DONE,
         SUBSCRIBED_SFIDA_COMMANDS,
     };
 
     Handshake(BLEDevice &ble, CertificateService* certificateService) :
         _ble(ble),
-        _step(ZERO)
+        _step(NONE),
+        _pendingState(NONE)
     {
         _certificateService = certificateService;
     }
 
-    bool init()
-    {
-        // TODO: Do we need anything?
-        return true;
-    }
-
-    bool update(HandshakeStep step)
+    bool changeState(HandshakeStep step)
     {
         switch (step)
         {
-            case ZERO:
-                return onReset();
+            case NONE:
+                break;
+
+            case CONNECTED:
+                if (_step != NONE) 
+                {
+                    return false;
+                }
+                break;
 
             case BOND_DONE:
-                return onBondingDone();
+                if (_step != CONNECTED)
+                {
+                    return false;
+                }
+                break;
 
             case SUBSCRIBED_SFIDA_COMMANDS:
-                return onSfidaSubscribed();
+                if (_step != BOND_DONE)
+                {
+                    return false;
+                }
+                break;
+        }
+
+        _pendingState = step;
+        return true;
+    }
+
+    bool update()
+    {
+        if (_step == _pendingState) 
+        {
+            return false;
+        }
+
+        // Select the appropiate function
+        bool (Handshake::*stateFnc)();
+        switch (_pendingState)
+        {
+            case NONE:
+                stateFnc = &Handshake::onReset;
+                break;
+
+            case CONNECTED:
+                stateFnc = &Handshake::onConnect;
+                break;
+
+            case BOND_DONE:
+                stateFnc = &Handshake::onBondDone;
+                break;
+
+            case SUBSCRIBED_SFIDA_COMMANDS:
+                stateFnc = &Handshake::onSfidaSubscribed;
+                break;
+
+            // Should never happen
+            default:
+                return false;
+        }
+
+        if ((this->*stateFnc)())
+        {
+            _step = _pendingState;
+            return true;
         }
 
         return false;
@@ -65,32 +119,26 @@ public:
 private:
     bool onReset()
     {
-        _step = ZERO;
+        // Nothing to do yet
         return true;
     }
 
-    bool onBondingDone()
+    bool onConnect()
     {
-        if (_step != ZERO)
-        {
-            return false;
-        }
+        // Nothing to do yet
+        return true;
+    }
 
-        _step = BOND_DONE;
+    bool onBondDone()
+    {
+        // Nothing to do yet
         return true;
     }
 
     bool onSfidaSubscribed()
     {
-        if (_step != BOND_DONE)
-        {
-            return false;
-        }
-
-        //uint8_t command[4] = {0, 0, 0, 0};
-        //_certificateService->send(command);
-
-        _step = SUBSCRIBED_SFIDA_COMMANDS;
+        uint8_t command[4] = {0, 0, 0, 0};
+        _certificateService->send(command);
         return true;
     }
 
@@ -99,6 +147,7 @@ private:
     CertificateService* _certificateService;
 
     HandshakeStep _step;
+    HandshakeStep _pendingState;
 };
 
 #endif /* #ifndef __HANDSHAKE_H__ */

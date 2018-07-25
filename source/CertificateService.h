@@ -61,23 +61,20 @@ public:
         return _sfidaToCentralChar.getValueHandle();
     }
 
-    void send(uint8_t* command, uint8_t* data = NULL, uint8_t len = 0)
+    void send(uint8_t (&command)[4], uint8_t* data = NULL, uint8_t len = 0)
     {
-        for (int i = 0; i < 4; ++i)
+        memcpy((void*)_writeBuffer, (void*)command, 4);
+
+        if (data != NULL)
         {
-            _writeBuffer[i] = command[i];
+            memcpy((void*)((intptr_t)_writeBuffer + 4), (void*)data, (size_t)len);
         }
 
-        for (int i = 4, j = 0; j < len; ++i, ++j)
-        {
-            _writeBuffer[i] = data[j];
-        }
-
-        // _ble.gattServer().write(
-        //     sfidaToCentralHandle(),
-        //     _writeBuffer,
-        //     len + 4
-        // );
+        _ble.gattServer().write(
+            sfidaToCentralHandle(),
+            _writeBuffer,
+            len + 4
+        );
     }
 
 private:

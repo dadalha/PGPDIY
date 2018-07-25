@@ -44,7 +44,7 @@ Handshake* handshake;
 void disconnectionCallback(const Gap::DisconnectionCallbackParams_t *params)
 {
     printf("DISCONNECTED: %x\n", params->reason);
-    handshake->update(Handshake::ZERO);
+    handshake->changeState(Handshake::NONE);
 
     if (params->reason == 0x3D)
     {
@@ -56,12 +56,13 @@ void disconnectionCallback(const Gap::DisconnectionCallbackParams_t *params)
 
 void connectionCallBack(const Gap::ConnectionCallbackParams_t *params ) {
     printf("CONNECTED\n");
-    handshake->init();
+    handshake->changeState(Handshake::CONNECTED);
 }
 
 void blinkCallback(void)
 {
     alivenessLED = !alivenessLED; /* Do blinky on LED1 to indicate system aliveness. */
+    handshake->update();
 }
 
 /**
@@ -112,7 +113,7 @@ void onUpdatesEnabled(const GattAttribute::Handle_t handle) {
         printf("NOTIFY CENTRAL TO SFIDA\n");
     }else if (handle == certificateService->sfidaCommandsHandle()) {
         printf("NOTIFY SFIDA COMMANDS\n");
-        handshake->update(Handshake::SUBSCRIBED_SFIDA_COMMANDS);
+        handshake->changeState(Handshake::SUBSCRIBED_SFIDA_COMMANDS);
     }else if (handle == certificateService->sfidaToCentralHandle()) {
         printf("NOTIFY SFIDA TO CENTRAL\n");
     }
@@ -143,7 +144,7 @@ void securitySetupCompletedCallback(Gap::Handle_t handle, SecurityManager::Secur
 {
     if (status == SecurityManager::SEC_STATUS_SUCCESS) {
         printf("Security success\r\n");
-        handshake->update(Handshake::BOND_DONE);
+        handshake->changeState(Handshake::BOND_DONE);
     } else {
         printf("Security failed\r\n");
     }
