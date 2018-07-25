@@ -31,15 +31,18 @@ public:
 
     CertificateService(BLEDevice &ble) :
         _ble(ble),
-        _sfidaCommandsChar(SFIDA_COMMANDS_CHARACTERISTIC_UUID, (uint8_t*)&_command1, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY),
-        _centralToSfidaChar(CENTRAL_TO_SFIDA_CHARACTERISTIC_UUID, (uint8_t*)&_command2, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE),
-        _sfidaToCentralChar(SFIDA_TO_CENTRAL_CHARACTERISTIC_UUID, (uint8_t*)&_command3, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ)
+        _sfidaCommandsChar(SFIDA_COMMANDS_CHARACTERISTIC_UUID, NULL, 0, 0, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY),
+        _centralToSfidaChar(CENTRAL_TO_SFIDA_CHARACTERISTIC_UUID, (uint8_t*)_readBuffer, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE),
+        _sfidaToCentralChar(SFIDA_TO_CENTRAL_CHARACTERISTIC_UUID, (uint8_t*)_writeBuffer, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_READ)
     {
-        _sfidaCommandsChar.requireSecurity(SecurityManager::SECURITY_MODE_ENCRYPTION_NO_MITM);
+        _sfidaCommandsChar.setSecurityRequirements(
+            GattCharacteristic::SecurityRequirement_t::UNAUTHENTICATED,
+            GattCharacteristic::SecurityRequirement_t::UNAUTHENTICATED,
+            GattCharacteristic::SecurityRequirement_t::UNAUTHENTICATED);
 
         GattCharacteristic *charTable[] = {&_sfidaCommandsChar, &_centralToSfidaChar, &_sfidaToCentralChar};
         GattService         certificateService(CERTIFICATE_SERVICE_UUID, charTable, sizeof(charTable) / sizeof(GattCharacteristic *));
-        ble_error_t res = ble.gattServer().addService(certificateService);
+        ble_error_t res = _ble.gattServer().addService(certificateService);
         printf("CertificateService: %d\n", res);
     }
 
@@ -58,15 +61,33 @@ public:
         return _sfidaToCentralChar.getValueHandle();
     }
 
+    void send(uint8_t* command, uint8_t* data = NULL, uint8_t len = 0)
+    {
+        for (int i = 0; i < 4; ++i)
+        {
+            _writeBuffer[i] = command[i];
+        }
+
+        for (int i = 4, j = 0; j < len; ++i, ++j)
+        {
+            _writeBuffer[i] = data[j];
+        }
+
+        // _ble.gattServer().write(
+        //     sfidaToCentralHandle(),
+        //     _writeBuffer,
+        //     len + 4
+        // );
+    }
+
 private:
     BLEDevice& _ble;
     GattCharacteristic _sfidaCommandsChar;
     GattCharacteristic _centralToSfidaChar;
     GattCharacteristic _sfidaToCentralChar;
 
-    uint8_t _command1[256];
-    uint8_t _command2[256];
-    uint8_t _command3[256];
+    uint8_t _readBuffer[256];
+    uint8_t _writeBuffer[256];
 };
 
 #endif /* #ifndef __BLE_LED_SERVICE_H__ */

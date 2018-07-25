@@ -35,7 +35,7 @@ public:
     {
         GattCharacteristic *charTable[] = {&_updateRequestChar, &_versionChar};
         GattService         firmwareService(FIRMWARE_SERVICE_UUID, charTable, sizeof(charTable) / sizeof(GattCharacteristic *));
-        printf("FirmwareService: %d\n", ble.addService(firmwareService));
+        printf("FirmwareService: %d\n", ble.gattServer().addService(firmwareService));
     }
 
 private:

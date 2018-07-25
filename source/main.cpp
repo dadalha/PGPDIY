@@ -22,6 +22,7 @@
 #include "ControlService.h"
 #include "CertificateService.h"
 #include "BatteryService.h"
+#include "Handshake.h"
 
 
 DigitalOut alivenessLED(LED1, 0);
@@ -38,42 +39,24 @@ FirmwareService* firmwareServire;
 ControlService* controlService;
 CertificateService* certificateService;
 BatteryService* batteryService;
+Handshake* handshake;
 
 void disconnectionCallback(const Gap::DisconnectionCallbackParams_t *params)
 {
-    (void) params;
-    printf("DISCONNECTED\n");
+    printf("DISCONNECTED: %x\n", params->reason);
+    handshake->update(Handshake::ZERO);
+
+    if (params->reason == 0x3D)
+    {
+        BLE::Instance().securityManager().purgeAllBondingState();
+    }
+
     BLE::Instance().gap().startAdvertising();
 }
 
 void connectionCallBack(const Gap::ConnectionCallbackParams_t *params ) {
     printf("CONNECTED\n");
-    // uint8_t index;
-    // if(params->role == Gap::PERIPHERAL) {
-    //     printf("Peripheral\n");
-    // }
-
-    // printf("The conn handle: %x\n", params->handle);
-    // printf("The conn role: %x\n", params->role);
-
-    // printf("The peerAddr type: %x\n", params->peerAddrType);
-    // printf("  The peerAddr: ");
-    // for(index=0; index<6; index++) {
-    //     printf("%x ", params->peerAddr[index]);
-    // }
-    // printf("\n");
-
-    // printf("The ownAddr type: %x\n", params->ownAddrType);
-    // printf("  The ownAddr: ");
-    // for(index=0; index<6; index++) {
-    //     printf("%x ", params->ownAddr[index]);
-    // }
-    // printf("\n");
-
-    // printf("The min connection interval: %x\n", params->connectionParams->minConnectionInterval);
-    // printf("The max connection interval: %x\n", params->connectionParams->maxConnectionInterval);
-    // printf("The slaveLatency: %x\n", params->connectionParams->slaveLatency);
-    // printf("The connectionSupervisionTimeout: %x\n", params->connectionParams->connectionSupervisionTimeout);
+    handshake->init();
 }
 
 void blinkCallback(void)
@@ -129,6 +112,7 @@ void onUpdatesEnabled(const GattAttribute::Handle_t handle) {
         printf("NOTIFY CENTRAL TO SFIDA\n");
     }else if (handle == certificateService->sfidaCommandsHandle()) {
         printf("NOTIFY SFIDA COMMANDS\n");
+        handshake->update(Handshake::SUBSCRIBED_SFIDA_COMMANDS);
     }else if (handle == certificateService->sfidaToCentralHandle()) {
         printf("NOTIFY SFIDA TO CENTRAL\n");
     }
@@ -155,19 +139,11 @@ void printMacAddress()
     printf("%02x\r\n", address[0]);
 }
 
-void passkeyDisplayCallback(Gap::Handle_t handle, const SecurityManager::Passkey_t passkey)
-{
-    printf("Input passKey: ");
-    for (unsigned i = 0; i < Gap::ADDR_LEN; i++) {
-        printf("%c ", passkey[i]);
-    }
-    printf("\r\n");
-}
- 
 void securitySetupCompletedCallback(Gap::Handle_t handle, SecurityManager::SecurityCompletionStatus_t status)
 {
     if (status == SecurityManager::SEC_STATUS_SUCCESS) {
         printf("Security success\r\n");
+        handshake->update(Handshake::BOND_DONE);
     } else {
         printf("Security failed\r\n");
     }
@@ -196,9 +172,9 @@ void bleInitComplete(BLE::InitializationCompleteCallbackContext *params)
     bool enableBonding = true;
     bool requireMITM   = false;
     ble.securityManager().init(enableBonding, requireMITM, SecurityManager::IO_CAPS_NONE);
-    ble.securityManager().onPasskeyDisplay(passkeyDisplayCallback);
+    // ble.securityManager().purgeAllBondingState();
     ble.securityManager().onSecuritySetupCompleted(securitySetupCompletedCallback);
-
+    
     /* Some config */
     ble.gap().setDeviceName((uint8_t*)DEVICE_NAME);  // Char 0x2A00
     // ble.gap().setAppearance(GapAdvertisingData::UNKNOWN);  // Char 0x2A01 - Doesn't work, uses AdversitingData class
@@ -220,6 +196,7 @@ void bleInitComplete(BLE::InitializationCompleteCallbackContext *params)
     controlService = new ControlService(ble);
     certificateService = new CertificateService(ble);
     batteryService = new BatteryService(ble);
+    handshake = new Handshake(ble, certificateService);
 
     /* setup advertising */
     GapAdvertisingData advertisingData;

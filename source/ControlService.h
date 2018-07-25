@@ -33,14 +33,17 @@ public:
 
     ControlService(BLEDevice &ble) :
         _ble(ble),
-        _ledVibrateChar(LED_VIBRATE_CHARACTERISTIC_UUID, (uint8_t*)&_pattern, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE),
+        _ledVibrateChar(LED_VIBRATE_CHARACTERISTIC_UUID, (uint8_t*)_pattern, 0, 256, GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_WRITE),
         _buttonChar(BUTTON_CHARACTERISTIC_UUID, &_button, 1, 1,  GattCharacteristic::BLE_GATT_CHAR_PROPERTIES_NOTIFY),
 
         _unkChar(UNK_CHARACTERISTIC_UUID, &_unk),
         _updateRequestChar(UPDATE_REQUEST_CHARACTERISTIC_UUID, &_update),
         _versionChar(VERSION_CHARACTERISTIC_UUID, &_version)
     {
-        _buttonChar.requireSecurity(SecurityManager::SECURITY_MODE_ENCRYPTION_NO_MITM);
+        _buttonChar.setSecurityRequirements(
+            GattCharacteristic::SecurityRequirement_t::UNAUTHENTICATED,
+            GattCharacteristic::SecurityRequirement_t::UNAUTHENTICATED,
+            GattCharacteristic::SecurityRequirement_t::UNAUTHENTICATED);
 
         GattCharacteristic *charTable[] = {&_ledVibrateChar, &_buttonChar, &_unkChar, &_updateRequestChar, &_versionChar};
         GattService         controlService(CONTROL_SERVICE_UUID, charTable, sizeof(charTable) / sizeof(GattCharacteristic *));
