@@ -17,7 +17,6 @@
 #include <events/mbed_events.h>
 #include <mbed.h>
 #include "ble/BLE.h"
-#include "LEDService.h"
 #include "FirmwareService.h"
 #include "ControlService.h"
 #include "CertificateService.h"
@@ -26,7 +25,6 @@
 
 
 DigitalOut alivenessLED(LED1, 0);
-//DigitalOut actuatedLED(LED2, 0);
 
 // const static char     DEVICE_NAME[] = "Podemos GO Plus";
 const static char     DEVICE_NAME[] = "Pokemon GO Plus";
@@ -34,17 +32,18 @@ const static uint8_t  VENDOR_ID[] = {0x62, 0x04, 0xC5, 0x21, 0x00};
 
 static EventQueue eventQueue(/* event count */ 10 * EVENTS_EVENT_SIZE);
 
-LEDService *ledServicePtr;
 FirmwareService* firmwareServire;
 ControlService* controlService;
 CertificateService* certificateService;
 BatteryService* batteryService;
-Handshake* handshake;
+
+// Static declarations
+Handshake* Handshake::_instance = NULL;
+
 
 void disconnectionCallback(const Gap::DisconnectionCallbackParams_t *params)
 {
-    printf("DISCONNECTED: %x\n", params->reason);
-    handshake->changeState(Handshake::NONE);
+    printf("Disconnection reason: %x\n", params->reason);
 
     if (params->reason == 0x3D)
     {
@@ -54,69 +53,15 @@ void disconnectionCallback(const Gap::DisconnectionCallbackParams_t *params)
     BLE::Instance().gap().startAdvertising();
 }
 
-void connectionCallBack(const Gap::ConnectionCallbackParams_t *params ) {
-    printf("CONNECTED\n");
-    handshake->changeState(Handshake::CONNECTED);
+void connectionCallBack(const Gap::ConnectionCallbackParams_t *params )
+{
+    printf("Connected\n");
 }
 
 void blinkCallback(void)
 {
     alivenessLED = !alivenessLED; /* Do blinky on LED1 to indicate system aliveness. */
-    handshake->update();
-}
-
-/**
- * This callback allows the LEDService to receive updates to the ledState Characteristic.
- *
- * @param[in] params
- *     Information about the characterisitc being updated.
- */
-void onDataWrittenCallback(const GattWriteCallbackParams *params) {
-    
-    if (params->handle == controlService->buttonHandle()) {
-        printf("WRITE BUTTON\n");
-    }else if (params->handle == controlService->ledVibrateHandle()) {
-        printf("WRITE LEDVIBRATE\n");
-    }else if (params->handle == controlService->unkHandle()) {
-        printf("WRITE UNK\n");
-    }else if (params->handle == controlService->updateRequestHandle()) {
-        printf("WRITE UPDATEREQUEST\n");
-    }else if (params->handle == controlService->versionHandle()) {
-        printf("WRITE VERSION\n");
-    }
-    else if (params->handle == certificateService->centralToSfidaHandle()) {
-        printf("WRITE CENTRAL TO SFIDA\n");
-    }else if (params->handle == certificateService->sfidaCommandsHandle()) {
-        printf("WRITE SFIDA COMMANDS\n");
-    }else if (params->handle == certificateService->sfidaToCentralHandle()) {
-        printf("WRITE SFIDA TO CENTRAL\n");
-    }
-
-    // if ((params->handle == ledServicePtr->getValueHandle()) && (params->len == 1)) {
-    //     //actuatedLED = *(params->data);
-    // }
-}
-
-void onUpdatesEnabled(const GattAttribute::Handle_t handle) {
-    if (handle == controlService->buttonHandle()) {
-        printf("NOTIFY BUTTON\n");
-    }else if (handle == controlService->ledVibrateHandle()) {
-        printf("NOTIFY LEDVIBRATE\n");
-    }else if (handle == controlService->unkHandle()) {
-        printf("NOTIFY UNK\n");
-    }else if (handle == controlService->updateRequestHandle()) {
-        printf("NOTIFY UPDATEREQUEST\n");
-    }else if (handle == controlService->versionHandle()) {
-        printf("NOTIFY VERSION\n");
-    }
-    else if (handle == certificateService->centralToSfidaHandle()) {
-        printf("NOTIFY CENTRAL TO SFIDA\n");
-    }else if (handle == certificateService->sfidaCommandsHandle()) {
-        printf("NOTIFY SFIDA COMMANDS\n");
-        handshake->changeState(Handshake::SUBSCRIBED_SFIDA_COMMANDS);
-    }else if (handle == certificateService->sfidaToCentralHandle()) {
-        printf("NOTIFY SFIDA TO CENTRAL\n");
-    }
+    Handshake::Instance()->update();
 }
 
 /**
@@ -138,16 +83,6 @@ void printMacAddress()
         printf("%02x:", address[i]);
     }
     printf("%02x\r\n", address[0]);
-}
-
-void securitySetupCompletedCallback(Gap::Handle_t handle, SecurityManager::SecurityCompletionStatus_t status)
-{
-    if (status == SecurityManager::SEC_STATUS_SUCCESS) {
-        printf("Security success\r\n");
-        handshake->changeState(Handshake::BOND_DONE);
-    } else {
-        printf("Security failed\r\n");
-    }
 }
 
 /**
@@ -173,31 +108,22 @@ void bleInitComplete(BLE::InitializationCompleteCallbackContext *params)
     bool enableBonding = true;
     bool requireMITM   = false;
     ble.securityManager().init(enableBonding, requireMITM, SecurityManager::IO_CAPS_NONE);
-    // ble.securityManager().purgeAllBondingState();
-    ble.securityManager().onSecuritySetupCompleted(securitySetupCompletedCallback);
     
     /* Some config */
     ble.gap().setDeviceName((uint8_t*)DEVICE_NAME);  // Char 0x2A00
     // ble.gap().setAppearance(GapAdvertisingData::UNKNOWN);  // Char 0x2A01 - Doesn't work, uses AdversitingData class
-    // ble.gap().enablePrivacy(false);
-
-    // Gap::PeripheralPrivacyConfiguration_t configuration;
-    // ble.gap().getPeripheralPrivacyConfiguration(&configuration);
-    // configuration.resolution_strategy = Gap::PeripheralPrivacyConfiguration_t::DO_NOT_RESOLVE;
 
     /* Callbacks */
     ble.gap().onConnection(connectionCallBack);
     ble.gap().onDisconnection(disconnectionCallback);
-    ble.gattServer().onDataWritten(onDataWrittenCallback);
-    ble.gattServer().onUpdatesEnabled(onUpdatesEnabled);
 
-    // bool initialValueForLEDCharacteristic = false;
-    //ledServicePtr = new LEDService(ble, initialValueForLEDCharacteristic);
     //firmwareServire = new FirmwareService(ble);
     controlService = new ControlService(ble);
     certificateService = new CertificateService(ble);
     batteryService = new BatteryService(ble);
-    handshake = new Handshake(ble, certificateService);
+    
+    // Initial setup
+    Handshake::Init(ble, certificateService);
 
     /* setup advertising */
     GapAdvertisingData advertisingData;
